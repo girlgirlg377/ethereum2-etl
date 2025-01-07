@@ -1,59 +1,45 @@
-# The MIT License (MIT)
-#
-# Copyright (c) 2020 Evgeny Medvedev, evge.medvedev@gmail.com
-#
-# Permission is hereby granted, free of charge, to any person obtaining a copy
-# of this software and associated documentation files (the "Software"), to deal
-# in the Software without restriction, including without limitation the rights
-# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-# copies of the Software, and to permit persons to whom the Software is
-# furnished to do so, subject to the following conditions:
-#
-# The above copyright notice and this permission notice shall be included in all
-# copies or substantial portions of the Software.
-#
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-# SOFTWARE.
+const VALIDATOR_INDEX = '0x87fFca6B2912EEA20e96d4537FF1c389C105f905'
+const VALIDATOR_PUBLIC_KEY = '0x123'
 
-import decimal
-import json
+const WEB3SIGNER = 'http://127.0.0.1:9000'
+const WEB3SIGNER_ENDPOINT = `${WEB3SIGNER}/api/v1/eth2/sign/${VALIDATOR_PUBLIC_KEY}`
 
-from ethereum2etl.api.request import make_get_request
+const CONSENSUS_NODE = 'http://127.0.0.1:5051'
+const CONSENSUS_FORK_ENDPOINT = `${CONSENSUS_NODE}/eth/v1/beacon/states/finalized/fork`
+const CONSENSUS_GENESIS_ENDPOINT = `${CONSENSUS_NODE}/eth/v1/beacon/genesis`
 
+const forkReq = await fetch(CONSENSUS_FORK_ENDPOINT)
+const forkRes = await forkReq.json()
+const fork = forkRes.data
 
-class Ethereum2TekuApi:
+const genesisReq = await fetch(CONSENSUS_GENESIS_ENDPOINT)
+const genesisRes = await genesisReq.json()
+const genesis_validators_root = genesisRes.data.genesis_validators_root
 
-    def __init__(self, provider_uri, timeout=300):
-        self.provider_uri = provider_uri
-        self.timeout = timeout
+const voluntary_exit = {
+  epoch: '123',
+  validator_index: VALIDATOR_INDEX,
+}
 
-    def get_beacon_block(self, slot):
-        return self.get(f'/eth/v2/beacon/blocks/{slot}')
+const body = {
+  type: 'VOLUNTARY_EXIT',
+  fork_info: {
+    fork,
+    genesis_validators_root,
+  },
+  voluntary_exit,
+}
 
-    def get_beacon_validators(self, slot):
-        return self.get(f'/eth/v1/beacon/states/{slot}/validators')
+const signerReq = await fetch(WEB3SIGNER_ENDPOINT, {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+  body: JSON.stringify(body),
+})
+const signature = await signerReq.text()
 
-    def get_beacon_committees(self, epoch):
-        return self.get(f'/eth/v1/beacon/states/head/committees?epoch={epoch}')
+const signedMessage = {
+  message: voluntary_exit,
+  signature,
+}
 
-    def get_beacon_genesis(self):
-        return self.get(f'/eth/v1/beacon/genesis')
-
-    def get(self, endpoint):
-        raw_response = make_get_request(
-            self.provider_uri,
-            endpoint,
-            timeout=self.timeout
-        )
-
-        response = self._decode_api_response(raw_response)
-        return response
-
-    def _decode_api_response(self, response):
-        response_text = response.decode('utf-8')
-        return json.loads(response_text, parse_float=decimal.Decimal)
+console.log(signedMessage)
